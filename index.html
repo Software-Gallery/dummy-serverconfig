@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Edit Config</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 560px;
+      margin: 32px auto;
+      padding: 0 16px;
+      line-height: 1.4;
+    }
+    h1 { margin-bottom: 8px; }
+    p { color: #444; }
+    label {
+      display: block;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    button {
+      margin-top: 16px;
+      margin-right: 8px;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+    .row { margin-top: 12px; }
+    .ok { color: #0a7a2e; }
+    .err { color: #b00020; }
+    code { background: #f3f3f3; padding: 2px 4px; }
+  </style>
+</head>
+<body>
+  <h1>Editor config.json</h1>
+  <p>Halaman ini membaca <code>config.json</code>, lalu Anda bisa mengubah <code>ip</code> dan <code>port</code>, kemudian mengunduh file hasilnya.</p>
+
+  <label for="ip">IP / Host URL</label>
+  <input id="ip" type="text" placeholder="Contoh: https://example.com" />
+
+  <label for="port">Port</label>
+  <input id="port" type="text" placeholder="Contoh: 8001" />
+
+  <div class="row">
+    <button id="loadBtn" type="button">Muat dari config.json</button>
+    <button id="downloadBtn" type="button">Unduh config.json baru</button>
+  </div>
+
+  <p id="status"></p>
+
+  <script>
+    const ipInput = document.getElementById('ip');
+    const portInput = document.getElementById('port');
+    const statusEl = document.getElementById('status');
+    const loadBtn = document.getElementById('loadBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.className = isError ? 'err' : 'ok';
+    }
+
+    function normalizeUrl(value) {
+      const trimmed = value.trim();
+      if (!trimmed) return '';
+      if (/^https?:\/\//i.test(trimmed)) return trimmed;
+      return `https://${trimmed}`;
+    }
+
+    function applyConfig(config) {
+      ipInput.value = config.ip || '';
+      portInput.value = config.port || '';
+    }
+
+    async function loadConfig() {
+      const candidates = [
+        new URL('config.json', window.location.href).toString(),
+        `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}config.json`,
+        `${window.location.origin}/config.json`
+      ];
+
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, { cache: 'no-store' });
+          if (!res.ok) continue;
+          const config = await res.json();
+          applyConfig(config);
+          setStatus('Config berhasil dimuat otomatis.');
+          return;
+        } catch (_) {
+        }
+      }
+
+      setStatus('Gagal memuat otomatis. Pastikan config.json ada di repo yang sama dengan index.html.', true);
+    }
+
+    if (window.location.protocol === 'file:') {
+      setStatus('Buka lewat URL GitHub Pages (https), bukan file:// lokal.', true);
+    }
+
+
+    function downloadConfig() {
+      const ip = normalizeUrl(ipInput.value);
+      const port = portInput.value.trim();
+
+      if (!ip) {
+        setStatus('IP/Host wajib diisi.', true);
+        return;
+      }
+
+      if (!/^\d+$/.test(port)) {
+        setStatus('Port harus berupa angka.', true);
+        return;
+      }
+
+      const nextConfig = { ip, port };
+      const blob = new Blob([JSON.stringify(nextConfig, null, 2) + '\n'], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'config.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      setStatus('File config.json baru berhasil diunduh.');
+    }
+
+    loadBtn.addEventListener('click', loadConfig);
+    downloadBtn.addEventListener('click', downloadConfig);
+
+    loadConfig();
+  </script>
+</body>
+</html>
